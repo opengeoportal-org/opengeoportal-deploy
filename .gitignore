@@ -1,0 +1,9 @@
+# Your settings with passwords: never commit. Copy .env.example to start one.
+.env
+
+# Editors and operating systems
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
