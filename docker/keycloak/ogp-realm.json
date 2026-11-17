@@ -1,0 +1,75 @@
+{
+  "realm": "ogp",
+  "displayName": "OpenGeoPortal",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "nl", "de", "fr", "es", "pt-BR", "it", "tr", "ar", "zh-CN", "ja"],
+  "defaultLocale": "en",
+  "roles": {
+    "realm": [
+      { "name": "administrator", "description": "Manages the portal: people, access rules and settings" },
+      { "name": "publisher", "description": "Adds and shares data, maps and apps" },
+      { "name": "user", "description": "Uses what is shared with them and works in projects" },
+      { "name": "viewer", "description": "Can only look at and download what is shared with them" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ogp-client",
+      "name": "OpenGeoPortal",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [ "${OGP_PUBLIC_URL}/*", "http://localhost:4200/*", "http://127.0.0.1/*" ],
+      "webOrigins": [ "+" ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${OGP_PUBLIC_URL}/*##http://localhost:4200/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "ogp-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "ogp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ogp-api",
+      "name": "OpenGeoPortal API",
+      "description": "Used by the API itself to manage people (for example the first administrator in the setup wizard)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OGP_KEYCLOAK_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-ogp-api",
+      "enabled": true,
+      "serviceAccountClientId": "ogp-api",
+      "clientRoles": {
+        "realm-management": [ "manage-users", "view-users", "query-users", "view-realm" ]
+      }
+    }
+  ]
+}

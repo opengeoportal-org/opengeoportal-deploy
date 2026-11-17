@@ -1,0 +1,22 @@
+# Builds the API and web client images from source instead of downloading them.
+# For developers: needs the opengeoportal repository next to this folder.
+#
+#     opengeoportal/            (git clone https://github.com/opengeoportal-org/opengeoportal.git)
+#       api/
+#       client/
+#     opengeoportal-deploy/     (this folder)
+#
+# Add this file after the one you normally use:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Set OGP_VERSION in .env to something like "dev", so your own builds never overwrite the downloaded images.
+
+services:
+  api:
+    build: ../opengeoportal/api
+    pull_policy: build
+
+  client:
+    build: ../opengeoportal/client
+    pull_policy: build

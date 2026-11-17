@@ -1,0 +1,99 @@
+# OpenGeoPortal, everything on one machine: database, Keycloak, API and web client.
+#
+#     cp .env.example .env     then change the passwords in .env
+#     docker compose up -d
+#
+# The first start takes a few minutes (downloading the images, Keycloak preparing itself).
+# When the command returns, open OGP_PUBLIC_URL (default http://localhost:8080).
+#
+# Own database or Keycloak on another server? Use docker-compose.external.yml instead.
+
+name: opengeoportal
+
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ogp
+      POSTGRES_USER: ogp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD in .env}
+      # PostGIS converts too (OGC API in the data's own coordinate system): the same grids as the API.
+      PROJ_NETWORK: ${OGP_PROJ_NETWORK:-ON}
+    volumes:
+      - ogp-db:/var/lib/postgresql/data
+      # Runs once, when the volume is new: creates Keycloak's own database on the same server.
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ogp -d ogp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Sign-in. Reachable for browsers under <OGP_PUBLIC_URL>/auth, through the web client.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    restart: unless-stopped
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+      # The address browsers use. Tokens are issued for it.
+      KC_HOSTNAME: ${OGP_PUBLIC_URL:?Set OGP_PUBLIC_URL in .env}/auth
+      # Lets the API talk to Keycloak over the internal address http://keycloak:8080/auth.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+      # Filled into docker/keycloak/ogp-realm.json when the realm is imported (first start only).
+      OGP_PUBLIC_URL: ${OGP_PUBLIC_URL}
+      OGP_KEYCLOAK_CLIENT_SECRET: ${OGP_KEYCLOAK_CLIENT_SECRET:?Set OGP_KEYCLOAK_CLIENT_SECRET in .env}
+    volumes:
+      - ./docker/keycloak/ogp-realm.json:/opt/keycloak/data/import/ogp-realm.json:ro
+    healthcheck:
+      # The image has no curl; ask the health endpoint on the management port with plain bash.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    extends:
+      file: docker-compose.external.yml
+      service: api
+    environment:
+      OGP_PUBLIC_URL: ${OGP_PUBLIC_URL}
+      OGP_DB_CONNECTION: Host=db;Port=5432;Database=ogp;Username=ogp;Password=${POSTGRES_PASSWORD}
+      OGP_DB_MIGRATION_CONNECTION: ""
+      OGP_KEYCLOAK_URL: ${OGP_PUBLIC_URL}/auth
+      OGP_KEYCLOAK_INTERNAL_URL: http://keycloak:8080/auth
+      OGP_KEYCLOAK_REQUIRE_HTTPS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  client:
+    extends:
+      file: docker-compose.external.yml
+      service: client
+    volumes:
+      - ./docker/nginx/keycloak.conf:/etc/nginx/ogp.d/keycloak.conf:ro
+    depends_on:
+      - api
+
+volumes:
+  ogp-db:
+  ogp-files:

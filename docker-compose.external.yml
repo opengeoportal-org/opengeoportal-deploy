@@ -1,0 +1,47 @@
+# OpenGeoPortal with YOUR OWN PostgreSQL/PostGIS and Keycloak (for example on other servers).
+# Starts only the portal itself: the API and the web client.
+#
+#     cp .env.example .env     then fill in the section "Your own database and Keycloak"
+#     docker compose -f docker-compose.external.yml up -d
+#
+# Everything on one machine instead? Use docker-compose.yml (just "docker compose up -d").
+# The images come from the GitHub Container Registry (ghcr.io/opengeoportal-org).
+
+name: opengeoportal
+
+services:
+  api:
+    image: ghcr.io/opengeoportal-org/api:${OGP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      OGP_PUBLIC_URL: ${OGP_PUBLIC_URL:-}
+      OGP_BEHIND_PROXY: ${OGP_BEHIND_PROXY:-false}
+      OGP_CORS_ORIGINS: ${OGP_CORS_ORIGINS:-}
+      OGP_DB_CONNECTION: ${OGP_DB_CONNECTION:-}
+      OGP_DB_MIGRATION_CONNECTION: ${OGP_DB_MIGRATION_CONNECTION:-}
+      OGP_DB_AUTO_MIGRATE: ${OGP_DB_AUTO_MIGRATE:-true}
+      OGP_KEYCLOAK_URL: ${OGP_KEYCLOAK_URL:-}
+      OGP_KEYCLOAK_INTERNAL_URL: ${OGP_KEYCLOAK_INTERNAL_URL:-}
+      OGP_KEYCLOAK_REALM: ${OGP_KEYCLOAK_REALM:-ogp}
+      OGP_KEYCLOAK_REQUIRE_HTTPS: ${OGP_KEYCLOAK_REQUIRE_HTTPS:-true}
+      OGP_KEYCLOAK_CLIENT_SECRET: ${OGP_KEYCLOAK_CLIENT_SECRET:-}
+      OGP_MAX_UPLOAD_MB: ${OGP_MAX_UPLOAD_MB:-512}
+      OGP_IMPORT_WORKERS: ${OGP_IMPORT_WORKERS:-2}
+      OGP_IMPORT_TIMEOUT_MINUTES: ${OGP_IMPORT_TIMEOUT_MINUTES:-60}
+      PROJ_NETWORK: ${OGP_PROJ_NETWORK:-ON}
+    volumes:
+      - ogp-files:/data/files
+
+  # The web client. Also forwards /api and /health to the API, so people only need this one port.
+  client:
+    image: ghcr.io/opengeoportal-org/client:${OGP_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "${OGP_PORT:-8080}:8080"
+    environment:
+      OGP_MAX_UPLOAD_MB: ${OGP_MAX_UPLOAD_MB:-512}
+    depends_on:
+      - api
+
+volumes:
+  ogp-files:
