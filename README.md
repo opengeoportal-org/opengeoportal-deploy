@@ -75,6 +75,7 @@ the images are downloaded.
 |---|---|
 | `/` | The portal |
 | `/health` | Status of the API, database and Keycloak |
+| `/api/docs` | The API documentation: every endpoint, to read and try. Off with `OGP_API_DOCS=false` in `.env` |
 | `/auth/admin` | Keycloak admin console (user `KEYCLOAK_ADMIN` from `.env`). People are managed in the portal (Settings > People); this is for Keycloak itself |
 
 ## Versions
